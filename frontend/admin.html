@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin | PsicoConnect</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="header">
+    <a class="logo" href="index.html">PsicoConnect</a>
+    <nav class="nav">
+      <a href="index.html">Início</a>
+      <a href="admin.html">Admin</a>
+      <a data-logout href="#">Sair</a>
+    </nav>
+  </header>
+
+  <main class="page-content" id="painelAdmin">
+    <section class="page-hero compact">
+      <h1>Administração</h1>
+      <p>Revise cadastros pendentes, aprove CRPs e acompanhe pagamentos simulados.</p>
+    </section>
+
+    <section class="admin-columns">
+      <article class="dashboard-card">
+        <h2>Cadastros pendentes</h2>
+        <div id="listaAprovacoes" class="dashboard-grid"></div>
+      </article>
+      <article class="dashboard-card">
+        <h2>Pagamentos simulados</h2>
+        <ul class="list-clean" id="listaPagamentos"></ul>
+      </article>
+    </section>
+  </main>
+
+  <footer class="footer"><p>© 2026 PsicoConnect</p></footer>
+  <script src="js/script.js"></script>
+</body>
+</html>

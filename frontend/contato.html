@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contato | PsicoConnect</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="header">
+    <a class="logo" href="index.html">PsicoConnect</a>
+    <nav class="nav">
+      <a href="index.html">Início</a>
+      <a href="sobre.html">Sobre</a>
+      <a href="login.html">Login</a>
+    </nav>
+  </header>
+
+  <main class="page-content narrow">
+    <section class="form-section">
+      <h1>Fale conosco</h1>
+      <p>Envie sua dúvida, sugestão ou solicitação de suporte.</p>
+      <form class="form-card" id="formContato">
+        <div class="input-group">
+          <label for="nomeContato">Nome</label>
+          <input type="text" id="nomeContato" required />
+        </div>
+        <div class="input-group">
+          <label for="emailContato">E-mail</label>
+          <input type="email" id="emailContato" required />
+        </div>
+        <div class="input-group">
+          <label for="mensagemContato">Mensagem</label>
+          <textarea id="mensagemContatoTexto" rows="5" required></textarea>
+        </div>
+        <p id="mensagemContatoStatus" class="mensagem"></p>
+        <p id="mensagemContato" class="mensagem"></p>
+        <button class="btn-primary" type="submit">Enviar</button>
+      </form>
+    </section>
+  </main>
+
+  <footer class="footer"><p>© 2026 PsicoConnect</p></footer>
+  <script src="js/script.js"></script>
+</body>
+</html>

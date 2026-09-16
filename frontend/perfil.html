@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Perfil do Psicólogo | PsicoConnect</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="header">
+    <a class="logo" href="index.html">PsicoConnect</a>
+    <nav class="nav">
+      <a href="index.html">Início</a>
+      <a href="psicologos.html">Psicólogos</a>
+      <a data-session-label href="login.html">Login</a>
+      <a data-logout href="#">Sair</a>
+    </nav>
+  </header>
+
+  <main class="page-content">
+    <section class="profile-layout">
+      <div class="profile-main">
+        <div class="profile-top">
+          <div class="avatar xl" id="perfilAvatar">AM</div>
+          <div>
+            <h1 id="perfilNome">Ana Martins</h1>
+            <p class="muted" id="perfilEspecialidade">Psicologia Clínica • CRP 08/12345</p>
+            <div class="tag-row"><span id="perfilCidade">Cascavel</span><span>Perfil aprovado</span></div>
+          </div>
+        </div>
+
+        <div class="content-card">
+          <h2>Sobre</h2>
+          <p id="perfilDescricao"></p>
+        </div>
+
+        <div class="content-card">
+          <h2>Especialidades</h2>
+          <div class="tag-row" id="perfilTags"></div>
+        </div>
+
+        <div class="content-card">
+          <h2>Endereço e mapa</h2>
+          <p id="perfilEndereco"></p>
+          <div class="map-placeholder">Integração futura com Google Maps</div>
+        </div>
+      </div>
+
+      <aside class="profile-side">
+        <div class="content-card sticky-card">
+          <h2>Horários disponíveis</h2>
+          <p>O agendamento usa estes horários automaticamente.</p>
+          <ul class="schedule-list" id="perfilHorarios"></ul>
+          <a class="btn-primary full-width" id="linkAgendarPerfil" href="#">Agendar consulta</a>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <footer class="footer"><p>© 2026 PsicoConnect</p></footer>
+  <script src="js/script.js"></script>
+</body>
+</html>

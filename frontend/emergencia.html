@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ajuda Emergencial | PsicoConnect</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="header">
+    <a class="logo" href="index.html">PsicoConnect</a>
+    <nav class="nav">
+      <a href="index.html">Início</a>
+      <a href="triagem.html">Triagem IA</a>
+      <a href="psicologos.html">Psicólogos</a>
+      <a data-session-label href="login.html">Login</a>
+      <a data-logout href="#">Sair</a>
+    </nav>
+  </header>
+
+  <main class="page-content narrow">
+    <section class="page-hero compact emergency-hero">
+      <h1>Ajuda emergencial</h1>
+      <p>Área de apoio rápido. Em risco imediato, procure emergência local ou ligue para serviços de urgência.</p>
+      <div class="hero-actions">
+        <a class="btn-danger" href="tel:188">Ligar CVV 188</a>
+        <a class="btn-secondary" target="_blank" href="https://www.google.com/maps/search/pronto+atendimento+perto+de+mim">Buscar pronto atendimento no mapa</a>
+      </div>
+    </section>
+
+    <section class="content-card">
+      <h2>Mensagem gerada para contato de confiança</h2>
+      <form id="formEmergencia">
+        <div class="two-columns">
+          <div class="input-group">
+            <label for="nomeEmergencia">Nome do contato</label>
+            <input id="nomeEmergencia" placeholder="Ex: Maria" />
+          </div>
+          <div class="input-group">
+            <label for="localEmergencia">Localização aproximada</label>
+            <input id="localEmergencia" placeholder="Ex: Centro, Cascavel" />
+          </div>
+        </div>
+        <button class="btn-primary" type="submit">Gerar mensagem</button>
+        <div class="input-group" style="margin-top:16px">
+          <label for="mensagemEmergenciaGerada">Mensagem</label>
+          <textarea id="mensagemEmergenciaGerada" rows="5" readonly></textarea>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <footer class="footer"><p>© 2026 PsicoConnect</p></footer>
+  <script src="js/script.js"></script>
+</body>
+</html>

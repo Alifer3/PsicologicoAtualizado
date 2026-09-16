@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agendamento | PsicoConnect</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="header">
+    <a class="logo" href="index.html">PsicoConnect</a>
+    <nav class="nav">
+      <a href="index.html">Início</a>
+      <a href="psicologos.html">Psicólogos</a>
+      <a data-session-label href="login.html">Login</a>
+      <a data-logout href="#">Sair</a>
+    </nav>
+  </header>
+
+  <main class="page-content narrow">
+    <section class="page-hero compact">
+      <h1>Agendar consulta</h1>
+      <p>Ao marcar uma consulta online, o sistema gera um link do Google Meet em modo simulado ou via API quando o backend estiver configurado.</p>
+    </section>
+
+    <form id="formAgendamento" class="form-card wide-form">
+      <div class="input-group">
+        <label for="profissional">Psicólogo</label>
+        <input type="text" id="profissional" readonly />
+      </div>
+      <div class="two-columns">
+        <div class="input-group">
+          <label for="paciente">Seu nome</label>
+          <input type="text" id="paciente" required />
+        </div>
+        <div class="input-group">
+          <label for="emailPaciente">Seu e-mail</label>
+          <input type="email" id="emailPaciente" required />
+        </div>
+      </div>
+      <div class="two-columns">
+        <div class="input-group">
+          <label for="dataConsulta">Data</label>
+          <select id="dataConsulta" required></select>
+        </div>
+        <div class="input-group">
+          <label for="horarioConsulta">Horário</label>
+          <select id="horarioConsulta" required></select>
+        </div>
+      </div>
+      <div class="input-group">
+        <label for="modalidadeConsulta">Modalidade</label>
+        <select id="modalidadeConsulta" required>
+          <option value="">Selecione</option>
+          <option>Online</option>
+          <option>Presencial</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label for="observacoes">Observações</label>
+        <textarea id="observacoes" rows="4" placeholder="Descreva brevemente a necessidade do atendimento"></textarea>
+      </div>
+      <p id="agendamentoAviso" class="muted"></p>
+      <p id="mensagemAgendamento" class="mensagem"></p>
+      <button class="btn-primary" type="submit">Confirmar agendamento</button>
+    </form>
+  </main>
+
+  <footer class="footer"><p>© 2026 PsicoConnect</p></footer>
+  <script src="js/script.js"></script>
+</body>
+</html>

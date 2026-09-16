@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Planos | PsicoConnect</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="header">
+    <a class="logo" href="index.html">PsicoConnect</a>
+    <nav class="nav">
+      <a href="index.html">Início</a>
+      <a href="cadastro-psicologo.html">Cadastro profissional</a>
+      <a href="login.html">Login</a>
+    </nav>
+  </header>
+
+  <main class="page-content">
+    <section class="page-hero compact">
+      <h1>Planos para psicólogos</h1>
+      <p>Selecione um plano, escolha o gateway e conclua o pagamento. Sem backend ativo, o sistema entra em modo simulado para testes.</p>
+    </section>
+
+    <section class="planos-grid">
+      <article class="plano-card">
+        <h2>Básico</h2>
+        <p class="preco">R$ 29,90/mês</p>
+        <ul>
+          <li>Perfil profissional</li>
+          <li>Agendamento online</li>
+          <li>Chat com pacientes</li>
+        </ul>
+        <button class="btn-primary btnPlano" data-plano="Básico">Escolher plano</button>
+      </article>
+      <article class="plano-card destaque">
+        <h2>Profissional</h2>
+        <p class="preco">R$ 49,90/mês</p>
+        <ul>
+          <li>Destaque moderado</li>
+          <li>Agenda avançada</li>
+          <li>Relatórios básicos</li>
+        </ul>
+        <button class="btn-primary btnPlano" data-plano="Profissional">Escolher plano</button>
+      </article>
+      <article class="plano-card">
+        <h2>Premium</h2>
+        <p class="preco">R$ 79,90/mês</p>
+        <ul>
+          <li>Maior destaque</li>
+          <li>Agenda completa</li>
+          <li>Prioridade de suporte</li>
+        </ul>
+        <button class="btn-primary btnPlano" data-plano="Premium">Escolher plano</button>
+      </article>
+    </section>
+
+    <section class="content-card narrow-card">
+      <h2>Integração de pagamento</h2>
+      <p id="statusPlano">Escolha um plano para liberar a simulação de pagamento.</p>
+      <div class="payment-sim">
+        <div class="input-group">
+          <label for="metodoPagamento">Método</label>
+          <select id="metodoPagamento">
+            <option>Stripe</option>
+            <option>Mercado Pago</option>
+            <option>Cartão de crédito</option>
+            <option>PIX</option>
+            <option>Sandbox local</option>
+          </select>
+        </div>
+        <button class="btn-primary" id="btnSimularPagamento">Simular pagamento</button>
+      </div>
+      <div class="notice-box">Para testes rápidos, a tela funciona em modo simulado. Para teste real, rode a pasta api/ e configure as chaves Stripe ou Mercado Pago no .env.</div>
+    </section>
+  </main>
+
+  <footer class="footer"><p>© 2026 PsicoConnect</p></footer>
+  <script src="js/script.js"></script>
+</body>
+</html>

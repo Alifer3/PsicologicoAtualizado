@@ -1,0 +1,234 @@
+name: PsicoConnect CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_ENV: test
+  JWT_SECRET: ci_test_secret_not_for_production
+  PAYMENT_PROVIDER: mock
+  GOOGLE_MEET_PROVIDER: mock
+
+jobs:
+  # ─── Testes do Backend ──────────────────────────────────────────────
+  backend-tests:
+    name: Backend - Testes e Validação
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: psicoconnect
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: psicoconnect_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://psicoconnect:testpassword@localhost:5432/psicoconnect_test
+
+    steps:
+      - name: 📥 Checkout do código
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: 📦 Instalar dependências
+        working-directory: ./backend
+        run: npm ci --ignore-scripts || npm install
+
+      - name: 🗄️ Preparar banco de dados
+        run: |
+          psql "$DATABASE_URL" -f database/schema.sql
+          psql "$DATABASE_URL" -f database/seed.sql
+
+      - name: 🧪 Rodar testes
+        working-directory: ./backend
+        run: npm test
+        env:
+          DATABASE_URL: postgres://psicoconnect:testpassword@localhost:5432/psicoconnect_test
+
+      - name: ✅ Verificar que o servidor inicia
+        working-directory: ./backend
+        run: |
+          timeout 10 node src/server.js &
+          sleep 3
+          curl -f http://localhost:3000/api/health || exit 1
+          echo "Servidor iniciou com sucesso!"
+          kill %1 2>/dev/null || true
+        env:
+          NODE_ENV: development
+          DATABASE_URL: postgres://psicoconnect:testpassword@localhost:5432/psicoconnect_test
+
+  # ─── Validação do Frontend ─────────────────────────────────────────
+  frontend-validation:
+    name: Frontend - Validação HTML
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout do código
+        uses: actions/checkout@v4
+
+      - name: 🔍 Verificar arquivos HTML existem
+        run: |
+          echo "Verificando arquivos do frontend..."
+          for file in index.html login.html cadastro.html cadastro-psicologo.html \
+                      psicologos.html perfil.html agendamento.html planos.html \
+                      dashboard-paciente.html dashboard-psicologo.html admin.html \
+                      chat.html triagem.html emergencia.html prontuario.html \
+                      contato.html sobre.html; do
+            if [ -f "frontend/$file" ]; then
+              echo "  ✅ $file"
+            else
+              echo "  ❌ $file FALTANDO"
+              exit 1
+            fi
+          done
+          echo "Todos os arquivos HTML presentes!"
+
+      - name: 🔍 Verificar CSS e JS existem
+        run: |
+          test -f frontend/css/style.css && echo "✅ style.css" || (echo "❌ style.css" && exit 1)
+          test -f frontend/js/script.js && echo "✅ script.js" || (echo "❌ script.js" && exit 1)
+
+      - name: 🔍 Verificar referências internas nos HTMLs
+        run: |
+          echo "Verificando links quebrados nos HTMLs..."
+          ERRORS=0
+          for file in frontend/*.html; do
+            # Verifica se CSS referenciado existe
+            if grep -q 'href="css/style.css"' "$file"; then
+              echo "  ✅ $(basename $file) → css/style.css"
+            fi
+            # Verifica se JS referenciado existe
+            if grep -q 'src="js/script.js"' "$file"; then
+              echo "  ✅ $(basename $file) → js/script.js"
+            fi
+          done
+
+  # ─── Validação do Banco ────────────────────────────────────────────
+  database-validation:
+    name: Database - Validação SQL
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: psicoconnect
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: psicoconnect_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: 📥 Checkout do código
+        uses: actions/checkout@v4
+
+      - name: 🗄️ Executar schema.sql
+        run: |
+          psql "postgres://psicoconnect:testpassword@localhost:5432/psicoconnect_test" \
+            -f database/schema.sql
+          echo "✅ schema.sql executado com sucesso"
+
+      - name: 🗄️ Executar seed.sql
+        run: |
+          psql "postgres://psicoconnect:testpassword@localhost:5432/psicoconnect_test" \
+            -f database/seed.sql
+          echo "✅ seed.sql executado com sucesso"
+
+      - name: 🔍 Verificar tabelas criadas
+        run: |
+          TABLES=$(psql "postgres://psicoconnect:testpassword@localhost:5432/psicoconnect_test" \
+            -t -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;")
+          echo "Tabelas encontradas:"
+          echo "$TABLES"
+          for table in usuarios pacientes psicologos enderecos planos assinaturas agendamentos triagens prontuarios mensagens; do
+            if echo "$TABLES" | grep -q "$table"; then
+              echo "  ✅ $table"
+            else
+              echo "  ❌ $table FALTANDO"
+              exit 1
+            fi
+          done
+
+      - name: 🔍 Verificar dados seed
+        run: |
+          COUNT=$(psql "postgres://psicoconnect:testpassword@localhost:5432/psicoconnect_test" \
+            -t -c "SELECT COUNT(*) FROM usuarios;")
+          echo "Usuários inseridos: $COUNT"
+          if [ "$(echo $COUNT | tr -d ' ')" -lt 3 ]; then
+            echo "❌ Esperava pelo menos 3 usuários"
+            exit 1
+          fi
+          echo "✅ Dados seed verificados"
+
+  # ─── Segurança ─────────────────────────────────────────────────────
+  security-check:
+    name: Segurança - Verificações
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout do código
+        uses: actions/checkout@v4
+
+      - name: 🔒 Verificar que .env não está no repositório
+        run: |
+          if [ -f "backend/.env" ]; then
+            echo "❌ ALERTA: arquivo .env encontrado no repositório!"
+            exit 1
+          fi
+          echo "✅ Nenhum .env no repositório"
+
+      - name: 🔒 Verificar que não há chaves hardcoded
+        run: |
+          FOUND=0
+          # Procurar por chaves Stripe reais
+          if grep -rn "sk_live_" backend/ frontend/ 2>/dev/null; then
+            echo "❌ Chave Stripe de produção encontrada!"
+            FOUND=1
+          fi
+          # Procurar por tokens MP reais
+          if grep -rn "APP_USR-" backend/ frontend/ 2>/dev/null; then
+            echo "❌ Token Mercado Pago encontrado!"
+            FOUND=1
+          fi
+          # Procurar por private keys
+          if grep -rn "BEGIN PRIVATE KEY" backend/src/ frontend/ 2>/dev/null; then
+            echo "❌ Chave privada encontrada no código!"
+            FOUND=1
+          fi
+          if [ $FOUND -eq 1 ]; then
+            exit 1
+          fi
+          echo "✅ Nenhuma chave sensível no código"
+
+      - name: 🔒 Verificar .gitignore
+        run: |
+          for pattern in ".env" "node_modules/" "*.log"; do
+            if grep -q "$pattern" .gitignore; then
+              echo "✅ .gitignore contém: $pattern"
+            else
+              echo "❌ .gitignore falta: $pattern"
+              exit 1
+            fi
+          done

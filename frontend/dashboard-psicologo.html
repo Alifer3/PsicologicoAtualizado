@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel do Psicólogo | PsicoConnect</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="header">
+    <a class="logo" href="index.html">PsicoConnect</a>
+    <nav class="nav">
+      <a href="index.html">Início</a>
+      <a href="dashboard-psicologo.html">Painel</a>
+      <a data-logout href="#">Sair</a>
+    </nav>
+  </header>
+
+  <main class="page-content" id="painelPsicologo">
+    <section class="page-hero compact">
+      <h1 id="tituloPsicologo">Olá</h1>
+      <p id="resumoPsicologo"></p>
+    </section>
+
+    <section class="dashboard-layout">
+      <div class="dashboard-column">
+        <article class="dashboard-card">
+          <h2>Minha agenda</h2>
+          <form id="formHorario">
+            <div class="two-columns">
+              <div class="input-group">
+                <label for="novaData">Data</label>
+                <input type="date" id="novaData" />
+              </div>
+              <div class="input-group">
+                <label for="novaHora">Hora</label>
+                <input type="time" id="novaHora" />
+              </div>
+            </div>
+            <p id="mensagemHorario" class="mensagem"></p>
+            <button class="btn-primary" type="submit">Adicionar horário</button>
+          </form>
+        </article>
+
+        <article class="dashboard-card">
+          <h2>Horários cadastrados</h2>
+          <ul class="list-clean" id="listaHorariosPsicologo"></ul>
+        </article>
+      </div>
+
+      <div class="dashboard-column">
+        <article class="dashboard-card">
+          <h2>Consultas agendadas</h2>
+          <div id="consultasPsicologo" class="dashboard-grid"></div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer"><p>© 2026 PsicoConnect</p></footer>
+  <script src="js/script.js"></script>
+</body>
+</html>

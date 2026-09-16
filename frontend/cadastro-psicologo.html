@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cadastro do Psicólogo | PsicoConnect</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="header">
+    <a class="logo" href="index.html">PsicoConnect</a>
+    <nav class="nav">
+      <a href="index.html">Início</a>
+      <a href="planos.html">Planos</a>
+      <a href="login.html">Login</a>
+    </nav>
+  </header>
+
+  <main class="page-content narrow">
+    <section class="form-section">
+      <h1>Cadastro profissional</h1>
+      <p>Preencha seus dados, valide o CRP e siga para a escolha do plano.</p>
+      <form id="formPsicologo" class="form-card">
+        <div class="input-group">
+          <label for="nome">Nome completo</label>
+          <input type="text" id="nome" required />
+        </div>
+        <div class="input-group">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" required />
+        </div>
+        <div class="input-group">
+          <label for="telefone">Telefone</label>
+          <input type="text" id="telefone" required />
+        </div>
+        <div class="two-columns">
+          <div class="input-group">
+            <label for="crpUf">UF do CRP</label>
+            <input type="text" id="crpUf" maxlength="2" placeholder="PR" required />
+          </div>
+          <div class="input-group">
+            <label for="crp">Número do CRP</label>
+            <input type="text" id="crp" placeholder="08/12345" required />
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="especialidade">Especialidade</label>
+          <input type="text" id="especialidade" placeholder="Ex: Ansiedade, Burnout, Terapia de casal" required />
+        </div>
+        <div class="two-columns">
+          <div class="input-group">
+            <label for="cip">Número da CIP</label>
+            <input type="text" id="cip" placeholder="Ex: CIP-PR-12345" required />
+          </div>
+          <div class="input-group">
+            <label for="documentoCip">Anexar CIP/CRP</label>
+            <input type="file" id="documentoCip" accept=".pdf,.jpg,.jpeg,.png" />
+          </div>
+        </div>
+        <div class="two-columns">
+          <div class="input-group">
+            <label for="cidadePsicologo">Cidade</label>
+            <input type="text" id="cidadePsicologo" placeholder="Cascavel" required />
+          </div>
+          <div class="input-group">
+            <label for="enderecoPsicologo">Endereço da clínica</label>
+            <input type="text" id="enderecoPsicologo" placeholder="Rua, número, bairro" required />
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="senha">Senha</label>
+          <input type="password" id="senha" required />
+        </div>
+        <div class="notice-box">
+          <strong>Importante:</strong> nesta versão, o CRP é validado pelo formato informado. Depois, seu cadastro pode passar por análise documental.
+        </div>
+        <p id="mensagemCRP" class="mensagem"></p>
+        <button type="submit" class="btn-primary">Validar CRP e continuar</button>
+      </form>
+    </section>
+  </main>
+
+  <footer class="footer"><p>© 2026 PsicoConnect</p></footer>
+  <script src="js/script.js"></script>
+</body>
+</html>

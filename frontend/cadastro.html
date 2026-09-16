@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cadastro de Paciente | PsicoConnect</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="header">
+    <a class="logo" href="index.html">PsicoConnect</a>
+    <nav class="nav">
+      <a href="index.html">Início</a>
+      <a href="login.html">Login</a>
+      <a href="cadastro-psicologo.html">Sou psicólogo</a>
+    </nav>
+  </header>
+
+  <main class="page-content narrow">
+    <section class="form-section">
+      <h1>Cadastro de paciente</h1>
+      <p>Crie sua conta para agendar consultas e acompanhar seus atendimentos.</p>
+      <form class="form-card" id="formPaciente">
+        <div class="input-group">
+          <label for="nomePacienteCadastro">Nome completo</label>
+          <input type="text" id="nomePacienteCadastro" required />
+        </div>
+        <div class="input-group">
+          <label for="emailPacienteCadastro">E-mail</label>
+          <input type="email" id="emailPacienteCadastro" required />
+        </div>
+        <div class="input-group">
+          <label for="telefonePacienteCadastro">Telefone</label>
+          <input type="text" id="telefonePacienteCadastro" required />
+        </div>
+        <div class="input-group">
+          <label for="senhaPacienteCadastro">Senha</label>
+          <input type="password" id="senhaPacienteCadastro" required />
+        </div>
+        <p id="mensagemPaciente" class="mensagem"></p>
+        <button class="btn-primary" type="submit">Criar conta</button>
+      </form>
+    </section>
+  </main>
+
+  <footer class="footer"><p>© 2026 PsicoConnect</p></footer>
+  <script src="js/script.js"></script>
+</body>
+</html>

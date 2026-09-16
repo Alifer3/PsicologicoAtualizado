@@ -1,0 +1,8 @@
+PsicoConnect_Reorganizado/
+├── frontend/      # HTML, CSS e JavaScript
+├── backend/       # API Node.js + Express + PostgreSQL
+├── database/      # schema.sql e seed.sql
+├── docs/          # documentação
+├── GUIA_RENDER_GITHUB.md
+├── README.md
+└── .gitignore
