@@ -638,3 +638,7 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 
 
 .badge{display:inline-flex;align-items:center;padding:8px 12px;border-radius:999px;background:#eef2ff;color:#3730a3;font-weight:700;font-size:.9rem}.badge.warning{background:#fff7ed;color:#9a3412}.card-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.integration-box{border:1px solid #e5e7eb;border-radius:16px;padding:16px;background:#f8fafc;margin-top:16px}.integration-box code{background:#e5e7eb;padding:2px 6px;border-radius:6px}
+
+/* Honeypot anti-bot: invisivel para humanos */
+.hp-field { position: absolute !important; left: -10000px !important; width: 1px; height: 1px; overflow: hidden; }
+

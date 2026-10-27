@@ -1,7 +1,27 @@
 import jwt from 'jsonwebtoken';
-import { query } from '../config/db.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'psicoconnect_dev_secret_troque_em_producao';
+// SEGURANÇA (Criptografia): sem valor padrão hardcoded. Se a variável não existir,
+// a aplicação NÃO deve assinar tokens com um segredo público conhecido.
+const MIN_SECRET_LENGTH = 32;
+const JWT_ALGORITHM = 'HS256';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
+
+function getSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < MIN_SECRET_LENGTH) {
+    throw new Error(`JWT_SECRET ausente ou fraca (mínimo ${MIN_SECRET_LENGTH} caracteres).`);
+  }
+  return secret;
+}
+
+/**
+ * Valida a configuração no startup (fail-fast).
+ * Retorna true se OK; caso contrário lança erro.
+ */
+export function assertJwtConfig() {
+  getSecret();
+  return true;
+}
 
 /**
  * Middleware que exige autenticação via JWT.
@@ -14,11 +34,13 @@ export function requireAuth(req, res, next) {
     return res.status(401).json({ ok: false, error: 'Token de autenticação não fornecido.' });
   }
 
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.slice(7).trim();
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
+    // algorithms fixo: impede ataques "alg: none" e confusão de algoritmo
+    const decoded = jwt.verify(token, getSecret(), { algorithms: [JWT_ALGORITHM] });
+    if (!decoded?.id || !decoded?.tipo) throw new Error('payload inválido');
+    req.user = { id: decoded.id, email: decoded.email, tipo: decoded.tipo };
     next();
   } catch (err) {
     return res.status(401).json({ ok: false, error: 'Token inválido ou expirado.' });
@@ -50,7 +72,7 @@ export function requireRole(...tipos) {
 export function generateToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, tipo: user.tipo },
-    JWT_SECRET,
-    { expiresIn: '7d' }
+    getSecret(),
+    { algorithm: JWT_ALGORITHM, expiresIn: JWT_EXPIRES_IN }
   );
 }

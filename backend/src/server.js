@@ -2,57 +2,73 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import Stripe from 'stripe';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { google } from 'googleapis';
 import databaseRoutes from './routes/databaseRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import { assertJwtConfig, requireAuth, requireRole } from './middleware/authMiddleware.js';
+import { authLimiter, blockScannerBots, globalLimiter } from './middleware/botProtection.js';
+import { findAgendamentoDoUsuario, isUUID, serverError } from './utils/security.js';
+
+// ─── Fail-fast: sem JWT_SECRET forte a API não sobe ─────────────────
+try {
+  assertJwtConfig();
+} catch (err) {
+  console.error(`FATAL: ${err.message}`);
+  if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) process.exit(1);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const APP_URL = process.env.APP_URL || 'http://localhost:5500';
+const APP_URL = process.env.APP_URL
+  || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'http://localhost:5500');
 
-// ─── Segurança ──────────────────────────────────────────────────────
+// Atrás de proxy (Vercel/Render) o IP real vem do X-Forwarded-For.
+// Necessário para o rate limit identificar o cliente correto.
+const trustProxy = process.env.TRUST_PROXY ?? (process.env.VERCEL ? '1' : 'false');
+app.set('trust proxy', trustProxy === 'false' ? false : Number(trustProxy) || trustProxy);
+
+// ─── Segurança: cabeçalhos HTTP ─────────────────────────────────────
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: false
+  crossOriginResourcePolicy: { policy: 'same-site' },
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      formAction: ["'none'"]
+    }
+  }
 }));
 
-// CORS configurável por variável de ambiente
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5500,http://127.0.0.1:5500')
-  .split(',').map(o => o.trim());
+// ─── CORS ───────────────────────────────────────────────────────────
+const allowedOrigins = new Set(
+  (process.env.ALLOWED_ORIGINS || 'http://localhost:5500,http://127.0.0.1:5500,http://localhost:3000')
+    .split(',').map(o => o.trim()).filter(Boolean)
+);
+for (const host of [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL]) {
+  if (host) allowedOrigins.add(`https://${host}`);
+}
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Permitir requests sem origin (mobile, Postman, etc)
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error('Origem não permitida pelo CORS.'));
+    // Sem Origin = mesma origem, mobile, Postman, curl
+    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    const err = new Error('Origem não permitida pelo CORS.');
+    err.status = 403;
+    callback(err);
   },
   credentials: true
 }));
 
-// Rate limiting global
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { ok: false, error: 'Muitas requisições. Tente novamente em alguns minutos.' }
-});
-app.use(limiter);
-
-// Rate limiting mais restrito para auth (previne brute-force)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { ok: false, error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' }
-});
-
-app.use(express.json({ limit: '1mb' }));
+// ─── Anti-bot ───────────────────────────────────────────────────────
+app.use('/api', blockScannerBots());
+app.use(globalLimiter);
+app.use(express.json({ limit: '100kb' }));
 
 // ─── Rotas ──────────────────────────────────────────────────────────
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', blockScannerBots({ requireUserAgent: true }), authLimiter, authRoutes);
 app.use('/api', databaseRoutes);
 
 // ─── Constantes ─────────────────────────────────────────────────────
@@ -83,11 +99,15 @@ app.get('/api/health', (_, res) => {
 });
 
 // ─── Pagamentos ─────────────────────────────────────────────────────
-app.post('/api/payments/create-checkout', async (req, res) => {
-  const { plano, metodo = 'mock', valor, nome, email, psicologoId } = req.body;
-  const amount = Number(valor || valoresPlanos[plano]);
-  if (!plano || !amount) return res.status(400).json({ ok: false, error: 'Plano ou valor inválido.' });
+// SEGURANÇA: o valor é SEMPRE definido pelo servidor (antes o cliente podia enviar
+// "valor": 0.01 e pagar o plano que quisesse). Exige psicólogo autenticado.
+app.post('/api/payments/create-checkout', requireAuth, requireRole('psicologo', 'admin'), async (req, res) => {
+  const { plano, metodo = 'mock', nome } = req.body;
+  const amount = Object.prototype.hasOwnProperty.call(valoresPlanos, plano) ? valoresPlanos[plano] : null;
+  if (!amount) return res.status(400).json({ ok: false, error: 'Plano inválido.' });
 
+  const email = req.user.email;
+  const psicologoId = req.user.id;
   const provider = (process.env.PAYMENT_PROVIDER || metodo || 'mock').toLowerCase();
 
   try {
@@ -105,11 +125,11 @@ app.post('/api/payments/create-checkout', async (req, res) => {
             product_data: { name: `PsicoConnect - Plano ${plano}` }
           }
         }],
-        metadata: { psicologoId: String(psicologoId || ''), plano },
+        metadata: { psicologoId: String(psicologoId), plano },
         success_url: `${APP_URL}/planos.html?payment=success`,
         cancel_url: `${APP_URL}/planos.html?payment=cancel`
       });
-      return res.json({ ok: true, status: 'Pendente', gateway: 'Stripe', transacaoId: session.id, checkoutUrl: session.url, mensagem: 'Checkout Stripe criado.' });
+      return res.json({ ok: true, status: 'Pendente', gateway: 'Stripe', valor: amount, transacaoId: session.id, checkoutUrl: session.url, mensagem: 'Checkout Stripe criado.' });
     }
 
     if ((provider.includes('mercado') || provider.includes('mercadopago')) && process.env.MERCADO_PAGO_ACCESS_TOKEN) {
@@ -117,28 +137,38 @@ app.post('/api/payments/create-checkout', async (req, res) => {
       const preference = new Preference(client);
       const result = await preference.create({ body: {
         items: [{ title: `PsicoConnect - Plano ${plano}`, quantity: 1, currency_id: 'BRL', unit_price: amount }],
-        payer: { name, email },
-        external_reference: String(psicologoId || ''),
+        payer: { name: typeof nome === 'string' ? nome.slice(0, 150) : undefined, email },
+        external_reference: String(psicologoId),
         back_urls: { success: `${APP_URL}/planos.html?payment=success`, failure: `${APP_URL}/planos.html?payment=failure`, pending: `${APP_URL}/planos.html?payment=pending` },
         auto_return: 'approved'
       }});
-      return res.json({ ok: true, status: 'Pendente', gateway: 'Mercado Pago', transacaoId: result.id, checkoutUrl: result.init_point || result.sandbox_init_point, mensagem: 'Preferência Mercado Pago criada.' });
+      return res.json({ ok: true, status: 'Pendente', gateway: 'Mercado Pago', valor: amount, transacaoId: result.id, checkoutUrl: result.init_point || result.sandbox_init_point, mensagem: 'Preferência Mercado Pago criada.' });
     }
 
-    return res.json({ ok: true, simulated: true, status: 'Pago', gateway: 'Mock', transacaoId: `mock_pay_${Date.now()}`, checkoutUrl: `${APP_URL}/planos.html?payment=mock`, mensagem: 'Pagamento aprovado em sandbox local.' });
+    return res.json({ ok: true, simulated: true, status: 'Pago', gateway: 'Mock', valor: amount, transacaoId: `mock_pay_${Date.now()}`, checkoutUrl: `${APP_URL}/planos.html?payment=mock`, mensagem: 'Pagamento aprovado em sandbox local.' });
   } catch (error) {
-    console.error('Erro no pagamento:', error.message);
-    return res.status(500).json({ ok: false, error: 'Erro ao processar pagamento.' });
+    return serverError(res, error, 'Erro no pagamento');
   }
 });
 
 // ─── Google Meet ────────────────────────────────────────────────────
-app.post('/api/meet/create-event', async (req, res) => {
-  const { consultaId, summary, description, startDateTime, endDateTime, pacienteEmail, psicologoEmail } = req.body;
-  const provider = (process.env.GOOGLE_MEET_PROVIDER || 'mock').toLowerCase();
+// SEGURANÇA: exige login, verifica se a consulta pertence ao usuário (anti-IDOR) e
+// usa os e-mails do BANCO (ignora e-mails do corpo => sem spam/spoofing de convites).
+app.post('/api/meet/create-event', requireAuth, async (req, res) => {
+  const { consultaId, summary, description, startDateTime, endDateTime } = req.body;
+  if (!isUUID(consultaId)) {
+    return res.status(400).json({ ok: false, error: 'consultaId inválido.' });
+  }
 
   try {
+    const agendamento = await findAgendamentoDoUsuario(consultaId, req.user);
+    if (!agendamento) {
+      return res.status(403).json({ ok: false, error: 'Consulta não encontrada ou acesso não autorizado.' });
+    }
+
+    const provider = (process.env.GOOGLE_MEET_PROVIDER || 'mock').toLowerCase();
     if (provider === 'google' && process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+      const start = startDateTime || new Date(agendamento.data_hora).toISOString();
       const auth = new google.auth.JWT({
         email: process.env.GOOGLE_CLIENT_EMAIL,
         key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
@@ -149,11 +179,11 @@ app.post('/api/meet/create-event', async (req, res) => {
         calendarId: process.env.GOOGLE_CALENDAR_ID || 'primary',
         conferenceDataVersion: 1,
         requestBody: {
-          summary,
-          description,
-          start: { dateTime: startDateTime, timeZone: 'America/Sao_Paulo' },
-          end: { dateTime: endDateTime || addOneHour(startDateTime), timeZone: 'America/Sao_Paulo' },
-          attendees: [pacienteEmail, psicologoEmail].filter(Boolean).map(email => ({ email })),
+          summary: String(summary || 'Consulta PsicoConnect').slice(0, 200),
+          description: String(description || '').slice(0, 2000),
+          start: { dateTime: start, timeZone: 'America/Sao_Paulo' },
+          end: { dateTime: endDateTime || addOneHour(start), timeZone: 'America/Sao_Paulo' },
+          attendees: [agendamento.paciente_email, agendamento.psicologo_email].filter(Boolean).map(email => ({ email })),
           conferenceData: { createRequest: { requestId: `psico-${consultaId}-${Date.now()}`, conferenceSolutionKey: { type: 'hangoutsMeet' } } }
         }
       });
@@ -162,25 +192,30 @@ app.post('/api/meet/create-event', async (req, res) => {
 
     return res.json({ ok: true, simulated: true, calendarEventId: `mock_event_${consultaId}`, meetLink: `https://meet.google.com/${slugMeet(consultaId)}`, mensagem: 'Meet criado em sandbox local.' });
   } catch (error) {
-    console.error('Erro no Meet:', error.message);
-    return res.status(500).json({ ok: false, error: 'Erro ao criar evento Meet.' });
+    return serverError(res, error, 'Erro no Meet');
   }
 });
 
+// ─── 404 da API ─────────────────────────────────────────────────────
+app.use('/api', (_, res) => res.status(404).json({ ok: false, error: 'Rota não encontrada.' }));
+
 // ─── Tratamento de erros global ─────────────────────────────────────
+// Nunca devolve stack trace nem mensagens internas (SQL, paths) ao cliente.
 app.use((err, req, res, _next) => {
-  console.error('Erro não tratado:', err.message);
-  const status = err.status || 500;
-  const message = process.env.NODE_ENV === 'production'
-    ? 'Erro interno do servidor.'
-    : err.message;
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) console.error('Erro não tratado:', err.message);
+  const message = status === 413 ? 'Corpo da requisição muito grande.'
+    : status === 400 && err.type === 'entity.parse.failed' ? 'JSON inválido.'
+    : status < 500 && err.expose !== false ? err.message
+    : 'Erro interno do servidor.';
   res.status(status).json({ ok: false, error: message });
 });
 
-// ─── Exportar app para testes ───────────────────────────────────────
+// ─── Exportar app para testes e para a Vercel ───────────────────────
 export { app };
+export default app;
 
-// ─── Iniciar servidor ───────────────────────────────────────────────
-if (process.env.NODE_ENV !== 'test') {
+// ─── Iniciar servidor (local/Render). Na Vercel o app roda como função. ──
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   app.listen(PORT, () => console.log(`PsicoConnect API v2.0 rodando em http://localhost:${PORT}`));
 }

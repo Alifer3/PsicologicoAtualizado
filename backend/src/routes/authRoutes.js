@@ -1,89 +1,111 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { body, validationResult } from 'express-validator';
-import { query } from '../config/db.js';
+import { query, withTransaction } from '../config/db.js';
 import { generateToken, requireAuth } from '../middleware/authMiddleware.js';
+import { honeypot, loginAccountLimiter } from '../middleware/botProtection.js';
 
 const router = express.Router();
 
+// ─── Criptografia de senhas ─────────────────────────────────────────
+// bcrypt com custo >= 12 (OWASP). Cada hash tem salt aleatório próprio.
+export const BCRYPT_ROUNDS = Math.max(10, Number(process.env.BCRYPT_ROUNDS) || 12);
+
+// Hash "fantasma": usado quando o e-mail não existe, para que o tempo de resposta
+// seja o mesmo de uma senha errada (evita enumeração de usuários por timing).
+const DUMMY_HASH = bcrypt.hashSync('psicoconnect-dummy-password', BCRYPT_ROUNDS);
+
+// Senha: 8 a 72 caracteres (bcrypt ignora bytes após o 72º), com letra e número.
+const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,72}$/;
+const CRP_RULE = /^\d{2}\/\d{4,6}$/;
+
 // ─── Validações reutilizáveis ───────────────────────────────────────
 const validateRegister = [
-  body('nome').trim().notEmpty().withMessage('Nome é obrigatório.'),
-  body('email').isEmail().normalizeEmail().withMessage('E-mail inválido.'),
-  body('senha').isLength({ min: 6 }).withMessage('Senha deve ter no mínimo 6 caracteres.'),
-  body('tipo').isIn(['paciente', 'psicologo']).withMessage('Tipo deve ser paciente ou psicologo.')
+  body('nome').isString().trim().isLength({ min: 2, max: 150 }).withMessage('Nome é obrigatório (2 a 150 caracteres).'),
+  body('email').isString().trim().isEmail().isLength({ max: 150 }).normalizeEmail().withMessage('E-mail inválido.'),
+  body('senha').isString().matches(PASSWORD_RULE)
+    .withMessage('Senha deve ter de 8 a 72 caracteres, com pelo menos uma letra e um número.'),
+  body('tipo').isIn(['paciente', 'psicologo']).withMessage('Tipo deve ser paciente ou psicologo.'),
+  body('telefone').optional({ values: 'falsy' }).isString().isLength({ max: 30 }).withMessage('Telefone inválido.'),
+  body('crp').if(body('tipo').equals('psicologo'))
+    .isString().trim().matches(CRP_RULE).withMessage('CRP é obrigatório no formato 00/00000.'),
+  body(['especialidade', 'cidade', 'genero']).optional({ values: 'falsy' }).isString().isLength({ max: 120 }),
+  body('estado').optional({ values: 'falsy' }).isString().isLength({ min: 2, max: 2 }),
+  body('valor_consulta').optional({ values: 'falsy' }).isFloat({ min: 0, max: 100000 })
 ];
 
 const validateLogin = [
-  body('email').isEmail().normalizeEmail().withMessage('E-mail inválido.'),
-  body('senha').notEmpty().withMessage('Senha é obrigatória.'),
-  body('tipo').isIn(['paciente', 'psicologo', 'admin']).withMessage('Tipo inválido.')
+  body('email').isString().trim().isEmail().normalizeEmail().withMessage('E-mail inválido.'),
+  body('senha').isString().isLength({ min: 1, max: 200 }).withMessage('Senha é obrigatória.'),
+  body('tipo').optional().isIn(['paciente', 'psicologo', 'admin']).withMessage('Tipo inválido.')
 ];
 
 function validationErrors(req, res) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ ok: false, errors: errors.array() });
+    // Não devolve o valor enviado (pode conter a senha)
+    const safe = errors.array().map(({ path, msg }) => ({ campo: path, msg }));
+    return res.status(400).json({ ok: false, errors: safe });
   }
   return null;
 }
 
+// Nunca devolver senha_hash ao cliente
+function publicUser(user, extras = {}) {
+  const { senha_hash, senha, ...rest } = { ...user, ...extras };
+  return rest;
+}
+
 // ─── POST /api/auth/register ────────────────────────────────────────
-router.post('/register', validateRegister, async (req, res) => {
+router.post('/register', honeypot, validateRegister, async (req, res) => {
   const errRes = validationErrors(req, res);
   if (errRes) return errRes;
 
   const { nome, email, senha, tipo, telefone } = req.body;
 
   try {
-    // Verificar email único
     const exists = await query('SELECT id FROM usuarios WHERE email = $1', [email]);
     if (exists.rows.length > 0) {
       return res.status(409).json({ ok: false, error: 'E-mail já cadastrado.' });
     }
 
-    // Hash da senha
-    const senha_hash = await bcrypt.hash(senha, 10);
+    const senha_hash = await bcrypt.hash(senha, BCRYPT_ROUNDS);
 
-    // Inserir usuário
-    const usuario = await query(
-      `INSERT INTO usuarios (nome, email, senha_hash, telefone, tipo)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id, nome, email, tipo, criado_em`,
-      [nome, email, senha_hash, telefone || null, tipo]
-    );
-
-    const user = usuario.rows[0];
-
-    // Criar registro específico por tipo
-    if (tipo === 'paciente') {
-      const { data_nascimento, genero, observacoes } = req.body;
-      await query(
-        `INSERT INTO pacientes (usuario_id, data_nascimento, genero, observacoes) VALUES ($1, $2, $3, $4)`,
-        [user.id, data_nascimento || null, genero || null, observacoes || null]
+    // Transação: ou cria tudo (usuário + perfil), ou nada.
+    const user = await withTransaction(async (client) => {
+      const usuario = await client.query(
+        `INSERT INTO usuarios (nome, email, senha_hash, telefone, tipo)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id, nome, email, tipo, criado_em`,
+        [nome, email, senha_hash, telefone || null, tipo]
       );
-    }
+      const u = usuario.rows[0];
 
-    if (tipo === 'psicologo') {
-      const { crp, especialidade, bio, valor_consulta, cidade, estado } = req.body;
-      if (!crp) {
-        return res.status(400).json({ ok: false, error: 'CRP é obrigatório para psicólogos.' });
-      }
-
-      const psicologo = await query(
-        `INSERT INTO psicologos (usuario_id, crp, especialidade, bio, valor_consulta)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        [user.id, crp, especialidade || null, bio || null, valor_consulta || 0]
-      );
-
-      if (cidade || estado) {
-        await query(
-          `INSERT INTO enderecos (psicologo_id, cidade, estado) VALUES ($1, $2, $3)`,
-          [psicologo.rows[0].id, cidade || null, estado || null]
+      if (tipo === 'paciente') {
+        const { data_nascimento, genero, observacoes } = req.body;
+        await client.query(
+          `INSERT INTO pacientes (usuario_id, data_nascimento, genero, observacoes) VALUES ($1, $2, $3, $4)`,
+          [u.id, data_nascimento || null, genero || null, observacoes || null]
         );
       }
-    }
 
-    // Gerar token
+      if (tipo === 'psicologo') {
+        // status_validacao NÃO é aceito do cliente: sempre nasce 'pendente' (mass assignment)
+        const { crp, especialidade, bio, valor_consulta, cidade, estado } = req.body;
+        const psicologo = await client.query(
+          `INSERT INTO psicologos (usuario_id, crp, especialidade, bio, valor_consulta)
+           VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+          [u.id, crp, especialidade || null, bio || null, valor_consulta || 0]
+        );
+        if (cidade || estado) {
+          await client.query(
+            `INSERT INTO enderecos (psicologo_id, cidade, estado) VALUES ($1, $2, $3)`,
+            [psicologo.rows[0].id, cidade || null, estado ? String(estado).toUpperCase() : null]
+          );
+        }
+      }
+      return u;
+    });
+
     const token = generateToken(user);
 
     return res.status(201).json({
@@ -93,37 +115,36 @@ router.post('/register', validateRegister, async (req, res) => {
       mensagem: 'Conta criada com sucesso.'
     });
   } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ ok: false, error: 'E-mail ou CRP já cadastrado.' });
+    }
     console.error('Erro no registro:', error.message);
     return res.status(500).json({ ok: false, error: 'Erro interno ao criar conta.' });
   }
 });
 
 // ─── POST /api/auth/login ───────────────────────────────────────────
-router.post('/login', validateLogin, async (req, res) => {
+router.post('/login', loginAccountLimiter, honeypot, validateLogin, async (req, res) => {
   const errRes = validationErrors(req, res);
   if (errRes) return errRes;
 
   const { email, senha, tipo } = req.body;
+  const INVALID = { ok: false, error: 'Usuário ou senha inválidos.' };
 
   try {
     const result = await query(
-      'SELECT id, nome, email, senha_hash, tipo FROM usuarios WHERE email = $1 AND tipo = $2',
-      [email, tipo === 'admin' ? 'admin' : tipo === 'Psicólogo' ? 'psicologo' : tipo === 'Paciente' ? 'paciente' : tipo]
+      'SELECT id, nome, email, senha_hash, tipo FROM usuarios WHERE email = $1',
+      [email]
     );
-
-    if (result.rows.length === 0) {
-      return res.status(401).json({ ok: false, error: 'Usuário ou senha inválidos.' });
-    }
-
     const user = result.rows[0];
 
-    // Verificar senha
-    const senhaValida = await bcrypt.compare(senha, user.senha_hash);
-    if (!senhaValida) {
-      return res.status(401).json({ ok: false, error: 'Usuário ou senha inválidos.' });
+    // Sempre executa bcrypt.compare (mesmo sem usuário) => tempo constante
+    const senhaValida = await bcrypt.compare(senha, user?.senha_hash || DUMMY_HASH);
+
+    if (!user || !user.senha_hash || !senhaValida || (tipo && tipo !== user.tipo)) {
+      return res.status(401).json(INVALID);
     }
 
-    // Buscar dados extras conforme tipo
     let extras = {};
     if (user.tipo === 'psicologo') {
       const psic = await query('SELECT id AS psicologo_id, status_validacao, crp FROM psicologos WHERE usuario_id = $1', [user.id]);
@@ -138,13 +159,7 @@ router.post('/login', validateLogin, async (req, res) => {
     return res.json({
       ok: true,
       token,
-      usuario: {
-        id: user.id,
-        nome: user.nome,
-        email: user.email,
-        tipo: user.tipo,
-        ...extras
-      },
+      usuario: publicUser(user, extras),
       mensagem: 'Login realizado com sucesso.'
     });
   } catch (error) {
@@ -186,7 +201,7 @@ router.get('/me', requireAuth, async (req, res) => {
       if (pac.rows.length) extras = pac.rows[0];
     }
 
-    return res.json({ ok: true, usuario: { ...user, ...extras } });
+    return res.json({ ok: true, usuario: publicUser(user, extras) });
   } catch (error) {
     console.error('Erro ao buscar perfil:', error.message);
     return res.status(500).json({ ok: false, error: 'Erro interno.' });
