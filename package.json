@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node backend/src/server.js",
     "test": "npm test --prefix backend",
-    "build": "echo 'Build concluído com sucesso para Vercel'"
+    "build": "node -e \"const fs=require('fs'); fs.cpSync('frontend', 'public', {recursive: true});\""
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

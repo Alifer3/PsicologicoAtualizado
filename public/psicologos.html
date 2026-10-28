@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Psicólogos | PsicoConnect</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="header">
+    <a class="logo" href="index.html">PsicoConnect</a>
+    <nav class="nav">
+      <a href="index.html">Início</a>
+      <a href="psicologos.html" class="active">Psicólogos</a>
+      <a href="sobre.html">Sobre</a>
+      <a data-session-label href="login.html">Login</a>
+      <a data-logout href="#">Sair</a>
+    </nav>
+  </header>
+
+  <main class="page-content">
+    <section class="page-hero compact">
+      <h1>Encontre um psicólogo</h1>
+      <p>Os perfis aprovados pelo admin aparecem aqui automaticamente. Use a triagem IA para receber uma sugestão de especialidade.</p>
+      <a class="btn-secondary" href="triagem.html">Abrir triagem inteligente</a>
+    </section>
+
+    <section class="filters-bar">
+      <input type="text" id="filtroNome" placeholder="Buscar por nome ou especialidade" />
+      <select id="filtroModalidade">
+        <option value="">Modalidade</option>
+        <option value="Online">Online</option>
+        <option value="Presencial">Presencial</option>
+      </select>
+      <select id="filtroCidade">
+        <option value="">Cidade</option>
+        <option value="Cascavel">Cascavel</option>
+        <option value="Curitiba">Curitiba</option>
+        <option value="Toledo">Toledo</option>
+      </select>
+    </section>
+
+    <section class="list-grid" id="listaPsicologos"></section>
+  </main>
+
+  <footer class="footer"><p>© 2026 PsicoConnect</p></footer>
+  <script src="js/script.js"></script>
+</body>
+</html>

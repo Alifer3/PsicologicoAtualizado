@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login | PsicoConnect</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="header">
+    <a class="logo" href="index.html">PsicoConnect</a>
+    <nav class="nav">
+      <a href="index.html">Início</a>
+      <a href="cadastro.html">Cadastro</a>
+      <a href="cadastro-psicologo.html">Sou psicólogo</a>
+    </nav>
+  </header>
+
+  <main class="page-content narrow">
+    <section class="form-section">
+      <h1>Entrar na plataforma</h1>
+      <p>Escolha o perfil e acesse o painel correspondente.</p>
+      <form class="form-card" id="formLogin">
+        <div class="input-group">
+          <label for="tipoUsuario">Entrar como</label>
+          <select id="tipoUsuario" required>
+            <option value="">Selecione</option>
+            <option>Paciente</option>
+            <option>Psicólogo</option>
+            <option>Administrador</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label for="emailLogin">E-mail</label>
+          <input type="email" id="emailLogin" required />
+        </div>
+        <div class="input-group">
+          <label for="senhaLogin">Senha</label>
+          <input type="password" id="senhaLogin" required />
+        </div>
+        <p id="mensagemLogin" class="mensagem"></p>
+        <button class="btn-primary" type="submit">Entrar</button>
+      </form>
+      <div class="demo-box" id="credenciaisDemo"></div>
+    </section>
+  </main>
+
+  <footer class="footer"><p>© 2026 PsicoConnect</p></footer>
+  <script src="js/script.js"></script>
+</body>
+</html>

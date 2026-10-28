@@ -5,11 +5,17 @@ import helmet from 'helmet';
 import Stripe from 'stripe';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { google } from 'googleapis';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import databaseRoutes from './routes/databaseRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import { assertJwtConfig, requireAuth, requireRole } from './middleware/authMiddleware.js';
 import { authLimiter, blockScannerBots, globalLimiter } from './middleware/botProtection.js';
 import { findAgendamentoDoUsuario, isUUID, serverError } from './utils/security.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendDir = path.resolve(__dirname, '../../frontend');
 
 // ─── Fail-fast: sem JWT_SECRET forte a API não sobe ─────────────────
 try {
@@ -35,9 +41,13 @@ app.use(helmet({
   contentSecurityPolicy: {
     useDefaults: true,
     directives: {
-      defaultSrc: ["'none'"],
-      frameAncestors: ["'none'"],
-      formAction: ["'none'"]
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      frameAncestors: ["'none'"]
     }
   }
 }));
@@ -196,8 +206,18 @@ app.post('/api/meet/create-event', requireAuth, async (req, res) => {
   }
 });
 
+// ─── Frontend Estático (compatível com local, Render e Vercel) ──────
+app.use(express.static(frontendDir, { extensions: ['html'] }));
+app.get('/', (_, res) => res.sendFile(path.join(frontendDir, 'index.html')));
+
 // ─── 404 da API ─────────────────────────────────────────────────────
 app.use('/api', (_, res) => res.status(404).json({ ok: false, error: 'Rota não encontrada.' }));
+
+// ─── Fallback para rotas do Frontend ────────────────────────────────
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(frontendDir, 'index.html'));
+});
 
 // ─── Tratamento de erros global ─────────────────────────────────────
 // Nunca devolve stack trace nem mensagens internas (SQL, paths) ao cliente.
